@@ -54,302 +54,318 @@ _PATH_PREFIX_LEN = len(_PATH_PREFIX)
 
 
 def _apply_realpath(argv):
-  """Run "realpath" on any path-related arguments.
+    """Run "realpath" on any path-related arguments.
 
-  Paths passed into the tool will be prefixed with the contents of _PATH_PREFIX.
-  If we find an argument with this prefix, we strip out the prefix and run
-  "realpath".
+    Paths passed into the tool will be prefixed with the contents of _PATH_PREFIX.
+    If we find an argument with this prefix, we strip out the prefix and run
+    "realpath".
 
-  Args:
-    argv: A list of command line arguments.
-  """
-  for i, arg in enumerate(argv):
-    if arg.startswith(_PATH_PREFIX):
-      arg = arg[_PATH_PREFIX_LEN:]
-      argv[i] = os.path.realpath(arg)
+    Args:
+      argv: A list of command line arguments.
+    """
+    for i, arg in enumerate(argv):
+        if arg.startswith(_PATH_PREFIX):
+            arg = arg[_PATH_PREFIX_LEN:]
+            argv[i] = os.path.realpath(arg)
 
 
 def ibtool_filtering(tool_exit_status, raw_stdout, raw_stderr):
-  """Filter messages from ibtool.
+    """Filter messages from ibtool.
 
-  Args:
-    tool_exit_status: The exit status of "xcrun ibtool".
-    raw_stdout: This is the unmodified stdout captured from "xcrun ibtool".
-    raw_stderr: This is the unmodified stderr captured from "xcrun ibtool".
+    Args:
+      tool_exit_status: The exit status of "xcrun ibtool".
+      raw_stdout: This is the unmodified stdout captured from "xcrun ibtool".
+      raw_stderr: This is the unmodified stderr captured from "xcrun ibtool".
 
-  Returns:
-    A tuple of the filtered stdout and strerr.
-  """
+    Returns:
+      A tuple of the filtered stdout and strerr.
+    """
 
-  spurious_patterns = [
-      re.compile(x)
-      for x in [r"WARNING: Unhandled destination metrics: \(null\)"]
-  ]
+    spurious_patterns = [
+        re.compile(x)
+        for x in [r"WARNING: Unhandled destination metrics: \(null\)"]
+    ]
 
-  def is_spurious_message(line):
-    for pattern in spurious_patterns:
-      match = pattern.search(line)
-      if match is not None:
-        return True
-    return False
+    def is_spurious_message(line):
+        for pattern in spurious_patterns:
+            match = pattern.search(line)
+            if match is not None:
+                return True
+        return False
 
-  stdout = []
-  for line in raw_stdout.splitlines():
-    if not is_spurious_message(line):
-      stdout.append(line + "\n")
+    stdout = []
+    for line in raw_stdout.splitlines():
+        if not is_spurious_message(line):
+            stdout.append(line + "\n")
 
-  # Some of the time, in a successful run, ibtool reports on stderr some
-  # internal assertions and ask "Please file a bug report with Apple", but
-  # it isn't clear that there is really a problem. Since everything else
-  # (warnings about assets, etc.) is reported on stdout, just drop stderr
-  # on successful runs.
-  if tool_exit_status == 0:
-    raw_stderr = None
+    # Some of the time, in a successful run, ibtool reports on stderr some
+    # internal assertions and ask "Please file a bug report with Apple", but
+    # it isn't clear that there is really a problem. Since everything else
+    # (warnings about assets, etc.) is reported on stdout, just drop stderr
+    # on successful runs.
+    if tool_exit_status == 0:
+        raw_stderr = None
 
-  return ("".join(stdout), raw_stderr)
+    return ("".join(stdout), raw_stderr)
 
 
-def ibtool(_, toolargs):
-  """Assemble the call to "xcrun ibtool"."""
-  xcrunargs = ["xcrun",
-               "ibtool",
-               "--errors",
-               "--warnings",
-               "--notices",
-               "--auto-activate-custom-fonts",
-               "--output-format",
-               "human-readable-text"]
+def ibtool(args, toolargs):
+    """Assemble the call to "xcrun ibtool"."""
+    xcrunargs = ["xcrun",
+                 "ibtool",
+                 "--errors",
+                 "--warnings",
+                 "--notices",
+                 "--auto-activate-custom-fonts",
+                 "--output-format",
+                 "human-readable-text"]
 
-  _apply_realpath(toolargs)
+    _apply_realpath(toolargs)
 
-  xcrunargs += toolargs
+    xcrunargs += toolargs
 
-  # If we are running into problems figuring out "ibtool" issues, there are a
-  # couple of environment variables that may help. Both of the following must be
-  # set to work.
-  #   IBToolDebugLogFile=<OUTPUT FILE PATH>
-  #   IBToolDebugLogLevel=4
-  # You may also see if
-  #   IBToolNeverDeque=1
-  # helps.
-  return_code, _, _ = execute.execute_and_filter_output(
-      xcrunargs,
-      trim_paths=True,
-      filtering=ibtool_filtering,
-      print_output=True)
-  return return_code
+    # If we are running into problems figuring out "ibtool" issues, there are a
+    # couple of environment variables that may help. Both of the following must be
+    # set to work.
+    #   IBToolDebugLogFile=<OUTPUT FILE PATH>
+    #   IBToolDebugLogLevel=4
+    # You may also see if
+    #   IBToolNeverDeque=1
+    # helps.
+    return_code, _, _ = execute.execute_and_filter_output(
+        xcrunargs,
+        trim_paths=True,
+        filtering=ibtool_filtering,
+        print_output=True)
+    # if return_code == 0:
+    #     return_code, _, _ = execute.execute_and_filter_output(
+    #         [args.nibsqueeze, '--recursive',
+    #             '--disable-merge-values', args.nibsqueezed],
+    #         print_output=True,
+    #     )
+    # if return_code != 0:
+    #     execute.execute_and_filter_output(
+    #         ['rm', '-r', args.nibsqueezed],
+    #         print_output=True,
+    #         raise_on_failure=True,
+    #     )
+    return return_code
 
 
 def actool_filtering(tool_exit_status, raw_stdout, raw_stderr):
-  """Filter the stdout messages from "actool".
+    """Filter the stdout messages from "actool".
 
-  Args:
-    tool_exit_status: The exit status of "xcrun actool".
-    raw_stdout: This is the unmodified stdout captured from "xcrun actool".
-    raw_stderr: This is the unmodified stderr captured from "xcrun actool".
+    Args:
+      tool_exit_status: The exit status of "xcrun actool".
+      raw_stdout: This is the unmodified stdout captured from "xcrun actool".
+      raw_stderr: This is the unmodified stderr captured from "xcrun actool".
 
-  Returns:
-    A tuple of the filtered stdout and strerr.
-  """
-  section_header = re.compile("^/\\* ([^ ]+) \\*/$")
+    Returns:
+      A tuple of the filtered stdout and strerr.
+    """
+    section_header = re.compile("^/\\* ([^ ]+) \\*/$")
 
-  excluded_sections = ["com.apple.actool.compilation-results"]
+    excluded_sections = ["com.apple.actool.compilation-results"]
 
-  spurious_patterns = [
-      re.compile(x) for x in [
-          r"\[\]\[ipad\]\[76x76\]\[\]\[\]\[1x\]\[\]\[\]: notice: \(null\)",
-          r"\[\]\[ipad\]\[76x76\]\[\]\[\]\[1x\]\[\]\[\]: notice: 76x76@1x app "
-          r"icons only apply to iPad apps targeting releases of iOS prior to "
-          r"10\.0\.",
-      ]
-  ]
+    spurious_patterns = [
+        re.compile(x) for x in [
+            r"\[\]\[ipad\]\[76x76\]\[\]\[\]\[1x\]\[\]\[\]: notice: \(null\)",
+            r"\[\]\[ipad\]\[76x76\]\[\]\[\]\[1x\]\[\]\[\]: notice: 76x76@1x app "
+            r"icons only apply to iPad apps targeting releases of iOS prior to "
+            r"10\.0\.",
+        ]
+    ]
 
-  def is_spurious_message(line):
-    for pattern in spurious_patterns:
-      match = pattern.search(line)
-      if match is not None:
-        return True
-    return False
+    def is_spurious_message(line):
+        for pattern in spurious_patterns:
+            match = pattern.search(line)
+            if match is not None:
+                return True
+        return False
 
-  output = []
-  current_section = None
-  data_in_section = False
+    output = []
+    current_section = None
+    data_in_section = False
 
-  for line in raw_stdout.splitlines():
-    header_match = section_header.search(line)
+    for line in raw_stdout.splitlines():
+        header_match = section_header.search(line)
 
-    if header_match:
-      data_in_section = False
-      current_section = header_match.group(1)
-      continue
+        if header_match:
+            data_in_section = False
+            current_section = header_match.group(1)
+            continue
 
-    if not current_section:
-      output.append(line + "\n")
-    elif current_section not in excluded_sections:
-      if is_spurious_message(line):
-        continue
+        if not current_section:
+            output.append(line + "\n")
+        elif current_section not in excluded_sections:
+            if is_spurious_message(line):
+                continue
 
-      if not data_in_section:
-        data_in_section = True
-        output.append("/* %s */\n" % current_section)
+            if not data_in_section:
+                data_in_section = True
+                output.append("/* %s */\n" % current_section)
 
-      output.append(line + "\n")
+            output.append(line + "\n")
 
-  # Some of the time, in a successful run, actool reports on stderr some
-  # internal assertions and ask "Please file a bug report with Apple", but
-  # it isn't clear that there is really a problem. Since everything else
-  # (warnings about assets, etc.) is reported on stdout, just drop stderr
-  # on successful runs.
-  if tool_exit_status == 0:
-    raw_stderr = None
+    # Some of the time, in a successful run, actool reports on stderr some
+    # internal assertions and ask "Please file a bug report with Apple", but
+    # it isn't clear that there is really a problem. Since everything else
+    # (warnings about assets, etc.) is reported on stdout, just drop stderr
+    # on successful runs.
+    if tool_exit_status == 0:
+        raw_stderr = None
 
-  return ("".join(output), raw_stderr)
+    return ("".join(output), raw_stderr)
 
 
 def actool(_, toolargs):
-  """Assemble the call to "xcrun actool"."""
-  xcrunargs = ["xcrun",
-               "actool",
-               "--errors",
-               "--warnings",
-               "--notices",
-               "--compress-pngs",
-               "--output-format",
-               "human-readable-text"]
+    """Assemble the call to "xcrun actool"."""
+    xcrunargs = ["xcrun",
+                 "actool",
+                 "--errors",
+                 "--warnings",
+                 "--notices",
+                 "--compress-pngs",
+                 "--output-format",
+                 "human-readable-text"]
 
-  _apply_realpath(toolargs)
+    _apply_realpath(toolargs)
 
-  xcrunargs += toolargs
+    xcrunargs += toolargs
 
-  # If we are running into problems figuring out "actool" issues, there are a
-  # couple of environment variables that may help. Both of the following must be
-  # set to work.
-  #   IBToolDebugLogFile=<OUTPUT FILE PATH>
-  #   IBToolDebugLogLevel=4
-  # You may also see if
-  #   IBToolNeverDeque=1
-  # helps.
-  # Yes, IBTOOL appears to be correct here due to "actool" and "ibtool" being
-  # based on the same codebase.
-  return_code, _, _ = execute.execute_and_filter_output(
-      xcrunargs,
-      trim_paths=True,
-      filtering=actool_filtering,
-      print_output=True)
-  return return_code
+    # If we are running into problems figuring out "actool" issues, there are a
+    # couple of environment variables that may help. Both of the following must be
+    # set to work.
+    #   IBToolDebugLogFile=<OUTPUT FILE PATH>
+    #   IBToolDebugLogLevel=4
+    # You may also see if
+    #   IBToolNeverDeque=1
+    # helps.
+    # Yes, IBTOOL appears to be correct here due to "actool" and "ibtool" being
+    # based on the same codebase.
+    return_code, _, _ = execute.execute_and_filter_output(
+        xcrunargs,
+        trim_paths=True,
+        filtering=actool_filtering,
+        print_output=True)
+    return return_code
 
 
 def coremlc(_, toolargs):
-  """Assemble the call to "xcrun coremlc"."""
-  xcrunargs = ["xcrun", "coremlc"]
-  _apply_realpath(toolargs)
-  xcrunargs += toolargs
+    """Assemble the call to "xcrun coremlc"."""
+    xcrunargs = ["xcrun", "coremlc"]
+    _apply_realpath(toolargs)
+    xcrunargs += toolargs
 
-  return_code, _, _ = execute.execute_and_filter_output(
-      xcrunargs,
-      print_output=True)
-  return return_code
+    return_code, _, _ = execute.execute_and_filter_output(
+        xcrunargs,
+        print_output=True)
+    return return_code
 
 
 def _zip_directory(directory, output):
-  """Zip the contents of the specified directory to the output file."""
-  zip_epoch_timestamp = 946684800  # 2000-01-01 00:00
+    """Zip the contents of the specified directory to the output file."""
+    zip_epoch_timestamp = 946684800  # 2000-01-01 00:00
 
-  # Set the timestamp of all files within "tmpdir" to the Zip Epoch:
-  # 2000-01-01 00:00. They are adjusted for timezone since Python "zipfile"
-  # checks the local timestamps of the files.
-  for root, _, files in os.walk(directory):
-    for f in files:
-      filepath = os.path.join(root, f)
-      timestamp = zip_epoch_timestamp + time.timezone
-      os.utime(filepath, (timestamp, timestamp))
+    # Set the timestamp of all files within "tmpdir" to the Zip Epoch:
+    # 2000-01-01 00:00. They are adjusted for timezone since Python "zipfile"
+    # checks the local timestamps of the files.
+    for root, _, files in os.walk(directory):
+        for f in files:
+            filepath = os.path.join(root, f)
+            timestamp = zip_epoch_timestamp + time.timezone
+            os.utime(filepath, (timestamp, timestamp))
 
-  shutil.make_archive(output, "zip", directory, ".")
+    shutil.make_archive(output, "zip", directory, ".")
 
 
 def swift_stdlib_tool(args, toolargs):
-  """Assemble the call to "xcrun swift-stdlib-tool" and zip the output."""
-  tmpdir = tempfile.mkdtemp(prefix="swiftstdlibtoolZippingOutput.")
-  destination = os.path.join(tmpdir, args.bundle)
+    """Assemble the call to "xcrun swift-stdlib-tool" and zip the output."""
+    tmpdir = tempfile.mkdtemp(prefix="swiftstdlibtoolZippingOutput.")
+    destination = os.path.join(tmpdir, args.bundle)
 
-  xcrunargs = ["xcrun",
-               "swift-stdlib-tool",
-               "--copy",
-               "--destination",
-               destination]
+    xcrunargs = ["xcrun",
+                 "swift-stdlib-tool",
+                 "--copy",
+                 "--destination",
+                 destination]
 
-  xcrunargs += toolargs
+    xcrunargs += toolargs
 
-  result, _, _ = execute.execute_and_filter_output(
-      xcrunargs,
-      print_output=True)
-  if not result:
-    _zip_directory(tmpdir, os.path.splitext(args.output)[0])
+    result, _, _ = execute.execute_and_filter_output(
+        xcrunargs,
+        print_output=True)
+    if not result:
+        _zip_directory(tmpdir, os.path.splitext(args.output)[0])
 
-  shutil.rmtree(tmpdir)
-  return result
+    shutil.rmtree(tmpdir)
+    return result
 
 
 def momc(_, toolargs):
-  """Assemble the call to "xcrun momc"."""
-  xcrunargs = ["xcrun", "momc"]
-  _apply_realpath(toolargs)
-  xcrunargs += toolargs
+    """Assemble the call to "xcrun momc"."""
+    xcrunargs = ["xcrun", "momc"]
+    _apply_realpath(toolargs)
+    xcrunargs += toolargs
 
-  return_code, _, _ = execute.execute_and_filter_output(
-      xcrunargs,
-      print_output=True)
-  return return_code
+    return_code, _, _ = execute.execute_and_filter_output(
+        xcrunargs,
+        print_output=True)
+    return return_code
 
 
 def mapc(_, toolargs):
-  """Assemble the call to "xcrun mapc"."""
-  xcrunargs = ["xcrun", "mapc"]
-  _apply_realpath(toolargs)
-  xcrunargs += toolargs
+    """Assemble the call to "xcrun mapc"."""
+    xcrunargs = ["xcrun", "mapc"]
+    _apply_realpath(toolargs)
+    xcrunargs += toolargs
 
-  return_code, _, _ = execute.execute_and_filter_output(
-      xcrunargs,
-      print_output=True)
-  return return_code
+    return_code, _, _ = execute.execute_and_filter_output(
+        xcrunargs,
+        print_output=True)
+    return return_code
 
 
 def main(argv):
-  parser = argparse.ArgumentParser()
-  subparsers = parser.add_subparsers()
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers()
 
-  # IBTOOL Argument Parser
-  ibtool_parser = subparsers.add_parser("ibtool")
-  ibtool_parser.set_defaults(func=ibtool)
+    # IBTOOL Argument Parser
+    ibtool_parser = subparsers.add_parser("ibtool")
+    ibtool_parser.add_argument(
+        '--nibsqueeze', help="The path to the nibsqueeze")
+    ibtool_parser.add_argument(
+        '--nibsqueezed', help="The path to be nibsqueezed")
+    ibtool_parser.set_defaults(func=ibtool)
 
-  # ACTOOL Argument Parser
-  actool_parser = subparsers.add_parser("actool")
-  actool_parser.set_defaults(func=actool)
+    # ACTOOL Argument Parser
+    actool_parser = subparsers.add_parser("actool")
+    actool_parser.set_defaults(func=actool)
 
-  # COREMLC Argument Parser
-  mapc_parser = subparsers.add_parser("coremlc")
-  mapc_parser.set_defaults(func=coremlc)
+    # COREMLC Argument Parser
+    mapc_parser = subparsers.add_parser("coremlc")
+    mapc_parser.set_defaults(func=coremlc)
 
-  # SWIFT-STDLIB-TOOL Argument Parser
-  swiftlib_parser = subparsers.add_parser("swift-stdlib-tool")
-  swiftlib_parser.add_argument("output", help="The output zip file.")
-  swiftlib_parser.add_argument(
-      "bundle",
-      help="The path inside of the archive to where the libs are copied.")
-  swiftlib_parser.set_defaults(func=swift_stdlib_tool)
+    # SWIFT-STDLIB-TOOL Argument Parser
+    swiftlib_parser = subparsers.add_parser("swift-stdlib-tool")
+    swiftlib_parser.add_argument("output", help="The output zip file.")
+    swiftlib_parser.add_argument(
+        "bundle",
+        help="The path inside of the archive to where the libs are copied.")
+    swiftlib_parser.set_defaults(func=swift_stdlib_tool)
 
-  # MOMC Argument Parser
-  momc_parser = subparsers.add_parser("momc")
-  momc_parser.set_defaults(func=momc)
+    # MOMC Argument Parser
+    momc_parser = subparsers.add_parser("momc")
+    momc_parser.set_defaults(func=momc)
 
-  # MAPC Argument Parser
-  mapc_parser = subparsers.add_parser("mapc")
-  mapc_parser.set_defaults(func=mapc)
+    # MAPC Argument Parser
+    mapc_parser = subparsers.add_parser("mapc")
+    mapc_parser.set_defaults(func=mapc)
 
-  # Parse the command line and execute subcommand
-  args, toolargs = parser.parse_known_args(argv)
-  sys.exit(args.func(args, toolargs))
+    # Parse the command line and execute subcommand
+    args, toolargs = parser.parse_known_args(argv)
+    sys.exit(args.func(args, toolargs))
 
 
 if __name__ == "__main__":
-  main(sys.argv[1:])
+    main(sys.argv[1:])

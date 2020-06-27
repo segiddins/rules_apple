@@ -163,6 +163,11 @@ _COMMON_PRIVATE_TOOL_ATTRS = dicts.add(
             executable = True,
             default = Label("@build_bazel_rules_apple//tools/xctoolrunner"),
         ),
+        "_nibsqueeze": attr.label(
+            cfg = "host",
+            executable = True,
+            default = Label("@nibsqueeze//:nibsqueeze"),
+        ),
         "_imported_dynamic_framework_processor": attr.label(
             cfg = "host",
             executable = True,

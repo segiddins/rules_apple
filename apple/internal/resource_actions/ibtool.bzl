@@ -35,7 +35,22 @@ load(
     "paths",
 )
 
-def _ibtool_arguments(min_os, families):
+def _nibsqueeze(ctx, output_dir):
+    unsqueezed_dir = ctx.actions.declare_directory(paths.join('unsqueezed', output_dir.basename), sibling = output_dir)
+    print("nibsqueeze %s to %s" % (unsqueezed_dir.path, output_dir.path))
+    legacy_actions.run(
+        ctx,
+        inputs = [unsqueezed_dir],
+        outputs = [output_dir],
+        tools = [ctx.executable._nibsqueeze],
+        executable = "/bin/sh",
+        arguments = ["-eux", "-c", "cp -rp $2/ $3 && chmod -R +xw $3 && $1 --recursive --disable-merge-values $3", "", ctx.executable._nibsqueeze.path, unsqueezed_dir.path, output_dir.path],
+        mnemonic = "NibSqueeze",
+        execution_requirements = {"no-sandbox": "1"},
+    )
+    return unsqueezed_dir
+
+def _ibtool_arguments(min_os, families, nibsqueeze, nibsqueezed):
     """Returns common `ibtool` command line arguments.
 
     This function returns the common arguments used by both xib and storyboard
@@ -50,6 +65,10 @@ def _ibtool_arguments(min_os, families):
       An array of command-line arguments to pass to ibtool.
     """
     return [
+        "--nibsqueeze",
+        nibsqueeze,
+        "--nibsqueezed",
+        nibsqueezed,
         "--minimum-deployment-target",
         min_os,
     ] + collections.before_each(
@@ -68,15 +87,16 @@ def compile_storyboard(ctx, swift_module, input_file, output_dir):
       output_dir: The directory where the compiled outputs should be placed.
     """
 
+    tmp_output = _nibsqueeze(ctx, output_dir)
     args = [
         "ibtool",
         "--compilation-directory",
-        xctoolrunner.prefixed_path(output_dir.dirname),
+        xctoolrunner.prefixed_path(tmp_output.dirname),
     ]
 
     min_os = platform_support.minimum_os(ctx)
     families = platform_support.families(ctx)
-    args.extend(_ibtool_arguments(min_os, families))
+    args.extend(_ibtool_arguments(min_os, families, ctx.executable._nibsqueeze.path, output_dir.path))
     args.extend([
         "--module",
         swift_module,
@@ -86,8 +106,9 @@ def compile_storyboard(ctx, swift_module, input_file, output_dir):
     legacy_actions.run(
         ctx,
         inputs = [input_file],
-        outputs = [output_dir],
+        outputs = [tmp_output],
         executable = ctx.executable._xctoolrunner,
+        tools = [ctx.executable._nibsqueeze],
         arguments = args,
         mnemonic = "StoryboardCompile",
         execution_requirements = {"no-sandbox": "1"},
@@ -110,12 +131,13 @@ def link_storyboards(ctx, storyboardc_dirs, output_dir):
     min_os = platform_support.minimum_os(ctx)
     families = platform_support.families(ctx)
 
+    tmp_output = _nibsqueeze(ctx, output_dir)
     args = [
         "ibtool",
         "--link",
-        xctoolrunner.prefixed_path(output_dir.path),
+        xctoolrunner.prefixed_path(tmp_output.path),
     ]
-    args.extend(_ibtool_arguments(min_os, families))
+    args.extend(_ibtool_arguments(min_os, families, ctx.executable._nibsqueeze.path, output_dir.path))
     args.extend([
         xctoolrunner.prefixed_path(f.path)
         for f in storyboardc_dirs
@@ -124,8 +146,9 @@ def link_storyboards(ctx, storyboardc_dirs, output_dir):
     legacy_actions.run(
         ctx,
         inputs = storyboardc_dirs,
-        outputs = [output_dir],
+        outputs = [tmp_output],
         executable = ctx.executable._xctoolrunner,
+        tools = [ctx.executable._nibsqueeze],
         arguments = args,
         mnemonic = "StoryboardLink",
         execution_requirements = {"no-sandbox": "1"},
@@ -146,13 +169,14 @@ def compile_xib(ctx, swift_module, input_file, output_dir):
     families = platform_support.families(ctx)
 
     nib_name = paths.replace_extension(paths.basename(input_file.short_path), ".nib")
+    tmp_output = _nibsqueeze(ctx, output_dir)
 
     args = [
         "ibtool",
         "--compile",
-        xctoolrunner.prefixed_path(paths.join(output_dir.path, nib_name)),
+        xctoolrunner.prefixed_path(paths.join(tmp_output.path, nib_name)),
     ]
-    args.extend(_ibtool_arguments(min_os, families))
+    args.extend(_ibtool_arguments(min_os, families, ctx.executable._nibsqueeze.path, output_dir.path))
     args.extend([
         "--module",
         swift_module,
@@ -162,8 +186,9 @@ def compile_xib(ctx, swift_module, input_file, output_dir):
     legacy_actions.run(
         ctx,
         inputs = [input_file],
-        outputs = [output_dir],
+        outputs = [tmp_output],
         executable = ctx.executable._xctoolrunner,
+        tools = [ctx.executable._nibsqueeze],
         arguments = args,
         mnemonic = "XibCompile",
         execution_requirements = {"no-sandbox": "1"},

@@ -69,3 +69,10 @@ def apple_rules_dependencies(ignore_version_differences = False):
         sha256 = "890faff3f6d5321712ffb7a09ba3614eabca93977221e86d058c7842fdbad6b6",
         urls = ["https://github.com/google/xctestrunner/releases/download/0.2.13/ios_test_runner.par"],
     )
+
+    _maybe(
+        git_repository,
+        name = "nibsqueeze",
+        remote = "https://github.com/segiddins/nibsqueeze.git",
+        branch = "segiddins/sort-nib",
+    )
